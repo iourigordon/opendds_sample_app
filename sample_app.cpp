@@ -22,9 +22,8 @@ using namespace OpenDDS::DCPS;
 DDS::Topic_var m_topic;
 DDS::DomainParticipant_var m_participant;
 
-void run_test() 
+int run_subscriber(bool block)
 {
-	//create subscriber
     DDS::Subscriber_var subscriber = m_participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT,
 																	  DDS::SubscriberListener::_nil(),
 																	  OpenDDS::DCPS::DEFAULT_STATUS_MASK);
@@ -48,36 +47,38 @@ void run_test()
 		fprintf(stdout,"failed to narrow data reader\n");
     }
 
-#if 0
-    // Block until Publisher completes
-    DDS::StatusCondition_var condition = reader->get_statuscondition();
-    condition->set_enabled_statuses(DDS::SUBSCRIPTION_MATCHED_STATUS);
+    if (block) {
+        // Block until Publisher completes
+        DDS::StatusCondition_var condition = reader->get_statuscondition();
+        condition->set_enabled_statuses(DDS::SUBSCRIPTION_MATCHED_STATUS);
 
-    DDS::WaitSet_var ws = new DDS::WaitSet;
-    ws->attach_condition(condition);
+        DDS::WaitSet_var ws = new DDS::WaitSet;
+        ws->attach_condition(condition);
 
-    DDS::ConditionSeq conditions;
-    DDS::SubscriptionMatchedStatus matches = { 0, 0, 0, 0, 0 };
-    DDS::Duration_t timeout = { 30, 0 }; // 30 seconds
+        DDS::ConditionSeq conditions;
+        DDS::SubscriptionMatchedStatus matches = { 0, 0, 0, 0, 0 };
+        DDS::Duration_t timeout = { 30, 0 }; // 30 seconds
 
-    do {
-      if (ws->wait(conditions, timeout) != DDS::RETCODE_OK) {
-        ACE_ERROR_RETURN((LM_ERROR,
-                          ACE_TEXT("ERROR: %N:%l: main() -")
-                          ACE_TEXT(" wait failed!\n")), -1);
-      }
+        do {
+            if (ws->wait(conditions, timeout) != DDS::RETCODE_OK) {
+                ACE_ERROR_RETURN((LM_ERROR,
+                                  ACE_TEXT("ERROR: %N:%l: main() -") 
+                                    ACE_TEXT(" wait failed!\n")), -1);
+            }
 
-      if (reader->get_subscription_matched_status(matches) != DDS::RETCODE_OK) {
-        ACE_ERROR_RETURN((LM_ERROR,
-                          ACE_TEXT("ERROR: %N:%l: main() -")
-                          ACE_TEXT(" get_subscription_matched_status() failed!\n")), -1);
-      }
-    } while (matches.current_count > 0);
+            if (reader->get_subscription_matched_status(matches) != DDS::RETCODE_OK) {
+                ACE_ERROR_RETURN((LM_ERROR,
+                                  ACE_TEXT("ERROR: %N:%l: main() -")
+                                  ACE_TEXT(" get_subscription_matched_status() failed!\n")), -1);
+            }
+        } while (matches.current_count > 0);
 
-    ws->detach_condition(condition);
-#endif
+        ws->detach_condition(condition);
+    }
+    return 0;
+}
 
-	//create publisher
+int run_publisher() {
 	DDS::Publisher_var publisher = m_participant->create_publisher(PUBLISHER_QOS_DEFAULT,
 																   DDS::PublisherListener::_nil(),
 																   OpenDDS::DCPS::DEFAULT_STATUS_MASK);
@@ -104,7 +105,6 @@ void run_test()
 
 
     DDS::Duration_t timeout = { 30, 0 };
-#if 1
     // Block until Subscriber is available
     DDS::StatusCondition_var condition = writer->get_statuscondition();
     condition->set_enabled_statuses(DDS::PUBLICATION_MATCHED_STATUS);
@@ -127,7 +127,6 @@ void run_test()
     } while (matches.current_count < 1);
 
     ws->detach_condition(condition);
-#endif
 
     // Write samples
     Messenger::Message message;
@@ -150,6 +149,13 @@ void run_test()
     if (message_writer->wait_for_acknowledgments(timeout) != DDS::RETCODE_OK) {
 		fprintf(stdout,"Failed to receive acknowledgement\n");    
     }
+    return 0;
+}
+
+void run_test() 
+{
+    run_subscriber(false);
+    run_publisher();
 }
 
 #if 0
