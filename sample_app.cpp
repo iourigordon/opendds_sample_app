@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <iostream>
 
 #include <dds/DdsDcpsInfrastructureC.h>
@@ -19,10 +20,9 @@ using namespace std;
 using namespace OpenDDS::RTPS;
 using namespace OpenDDS::DCPS;
 
-DDS::Topic_var m_topic;
 DDS::DomainParticipant_var m_participant;
 
-int run_subscriber(bool block)
+int run_subscriber(bool block, DDS::Topic_ptr topic)
 {
     DDS::Subscriber_var subscriber = m_participant->create_subscriber(SUBSCRIBER_QOS_DEFAULT,
 																	  DDS::SubscriberListener::_nil(),
@@ -34,7 +34,7 @@ int run_subscriber(bool block)
     // Create DataReader
     DDS::DataReaderListener_var listener(new DataReaderListenerImpl);
 
-    DDS::DataReader_var reader = subscriber->create_datareader(m_topic.in(),
+    DDS::DataReader_var reader = subscriber->create_datareader(topic,
 															   DATAREADER_QOS_DEFAULT,
 															   listener.in(),
 															   OpenDDS::DCPS::DEFAULT_STATUS_MASK);
@@ -60,17 +60,18 @@ int run_subscriber(bool block)
         DDS::Duration_t timeout = { 30, 0 }; // 30 seconds
 
         do {
+            if (reader->get_subscription_matched_status(matches) != DDS::RETCODE_OK) {
+                ACE_ERROR_RETURN((LM_ERROR,
+                                  ACE_TEXT("ERROR: %N:%l: main() -")
+                                  ACE_TEXT(" get_subscription_matched_status() failed!\n")), -1);
+            }
+
             if (ws->wait(conditions, timeout) != DDS::RETCODE_OK) {
                 ACE_ERROR_RETURN((LM_ERROR,
                                   ACE_TEXT("ERROR: %N:%l: main() -") 
                                     ACE_TEXT(" wait failed!\n")), -1);
             }
 
-            if (reader->get_subscription_matched_status(matches) != DDS::RETCODE_OK) {
-                ACE_ERROR_RETURN((LM_ERROR,
-                                  ACE_TEXT("ERROR: %N:%l: main() -")
-                                  ACE_TEXT(" get_subscription_matched_status() failed!\n")), -1);
-            }
         } while (matches.current_count > 0);
 
         ws->detach_condition(condition);
@@ -78,7 +79,7 @@ int run_subscriber(bool block)
     return 0;
 }
 
-int run_publisher() {
+int run_publisher(DDS::Topic_ptr topic) {
 	DDS::Publisher_var publisher = m_participant->create_publisher(PUBLISHER_QOS_DEFAULT,
 																   DDS::PublisherListener::_nil(),
 																   OpenDDS::DCPS::DEFAULT_STATUS_MASK);
@@ -88,7 +89,7 @@ int run_publisher() {
     }
 
     // Create DataWriter
-    DDS::DataWriter_var writer = publisher->create_datawriter(m_topic.in(),
+    DDS::DataWriter_var writer = publisher->create_datawriter(topic,
 															  DATAWRITER_QOS_DEFAULT,
 															  DDS::DataWriterListener::_nil(),
 															  OpenDDS::DCPS::DEFAULT_STATUS_MASK);
@@ -152,10 +153,44 @@ int run_publisher() {
     return 0;
 }
 
-void run_test() 
+
+DDS::Topic_ptr create_msg_topic() {
+    DDS::Topic_ptr topic; 
+	Messenger::MessageTypeSupport_var ts = new Messenger::MessageTypeSupportImpl;
+
+	if (ts->register_type(m_participant, "") != DDS::RETCODE_OK) {
+		fprintf(stdout,"failed to register type\n");
+	}
+
+	CORBA::String_var type_name = ts->get_type_name();
+	fprintf(stdout,"type_name = %s\n", type_name.in());
+
+	topic = m_participant->create_topic("Movie Discussion List",
+		    							  type_name,
+			    						  TOPIC_QOS_DEFAULT,
+				    					  0,
+					    				  OpenDDS::DCPS::DEFAULT_STATUS_MASK);
+    if (CORBA::is_nil(topic)) {
+	    fprintf(stdout,"Failed to create topic\n");
+        return NULL;
+    }
+    return topic;
+}
+
+void run_test(DDS::Topic_ptr topic) 
 {
-    run_subscriber(false);
-    run_publisher();
+    run_subscriber(false,topic);
+    run_publisher(topic);
+}
+
+void* subscriber_thread(void* args)
+{
+    run_subscriber(true,create_msg_topic());
+}
+
+void* publisher_thread(void* args)
+{
+    run_publisher(create_msg_topic());
 }
 
 #if 0
@@ -239,16 +274,19 @@ int main(int argc, char* argv[]) {
 
 int main(int argc, char* argv[])
 {
+    bool threads;
+    pthread_t sub_id, pub_id;
     DDS::DomainId_t domain;
     DDS::DomainParticipantFactory_var dpf;
 
     fprintf(stdout,"argc = %d\n",argc);
-    if ((argc != 2) && (argc != 3))
+    if ((argc != 2) && (argc != 4))
     {
         fprintf(stdout,"Need to supply either '-DSCPConfigFile filename' or 'multi/single' for number of threads to create\n");
         return 0;
     }
 
+    threads = false;
     switch(argc) {
         case 2: {
             dpf = TheParticipantFactory;
@@ -277,11 +315,17 @@ int main(int argc, char* argv[])
             dpf->get_default_participant_qos(dp_qos);
 
             rui->dump();
+            if (strcmp(argv[1],"multi") == 0) {
+                threads = true;
+            }
             break;
         }
-        case 3:
-            fprintf(stdout,"arg[%d] = %s; arg[%d] = %s\n",1,argv[1],2,argv[2]);
+        case 4:
+            domain = 42;
             dpf  = TheParticipantFactoryWithArgs(argc,argv);
+            if (strcmp(argv[1],"multi") == 0) {
+                threads = true;
+            }
             break;
         default:
             fprintf(stdout,"only one or two arguments should be supplied\n");
@@ -297,25 +341,18 @@ int main(int argc, char* argv[])
       return EXIT_FAILURE;
     }
 
-	Messenger::MessageTypeSupport_var ts = new Messenger::MessageTypeSupportImpl;
-
-	if (ts->register_type(m_participant, "") != DDS::RETCODE_OK) {
-		fprintf(stdout,"failed to register type\n");
-	}
-
-	CORBA::String_var type_name = ts->get_type_name();
-	fprintf(stdout,"type_name = %s\n", type_name.in());
-	m_topic = m_participant->create_topic("Movie Discussion List",
-										  type_name,
-										  TOPIC_QOS_DEFAULT,
-										  0,
-										  OpenDDS::DCPS::DEFAULT_STATUS_MASK);
-
-    if (CORBA::is_nil(m_topic.in())) {
-		fprintf(stdout,"Failed to create topic\n");
+    if (!threads) {
+        fprintf(stdout,"Running single thread test\n");
+	    run_test(create_msg_topic());
+    } else {
+        fprintf(stdout,"Spinning threads\n");
+        pthread_create(&sub_id,NULL,subscriber_thread,NULL);
+        pthread_create(&pub_id,NULL,publisher_thread,NULL);
+        
+        fprintf(stdout,"Joining threads\n");
+        pthread_join(sub_id,NULL);
+        pthread_join(pub_id,NULL);
     }
-
-	run_test();
 
     m_participant->delete_contained_entities();
     dpf->delete_participant(m_participant);

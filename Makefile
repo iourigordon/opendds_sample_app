@@ -10,12 +10,12 @@ TAO_IDL:=$(DDS_ROOT)/../..//bin/tao_idl
 OPENDDS_IDL:=$(DDS_ROOT)/../../bin/opendds_idl
 TAO_INCLUDES:=-I$(DDS_ROOT)../../include/tao -I$(DDS_ROOT)/../../include
 
-LDFLAGS:=-L/opt/opendds/lib
+LDFLAGS:=-L/opt/opendds/lib -lpthread
 #LDLIBS:=-lOpenDDS_Rtps -lOpenDDS_Rtps_Udp -lOpenDDS_InfoRepoDiscovery -lOpenDDS_Dcps -lTAO_BiDirGIOP -lTAO_PI -lTAO_CodecFactory -lTAO_PortableServer -lTAO_AnyTypeCode -lTAO -lACE
 
 LDLIBS:=-lOpenDDS_Rtps_Udp -lOpenDDS_Rtps -lOpenDDS_Multicast -lOpenDDS_Udp -lOpenDDS_Tcp -lOpenDDS_InfoRepoDiscovery -lOpenDDS_Dcps -lTAO_BiDirGIOP -lTAO_PI -lTAO_CodecFactory -lTAO_PortableServer -lTAO_AnyTypeCode -lTAO -lACE
 
-CXXFLAGS= -g -std=c++14 -I/opt/opendds/include -I./gen/
+CXXFLAGS= -g -std=c++14 -I/opt/opendds/include -I./gen/ -pthread
 
 SRC_CPP:=sample_app.cpp DataReaderListenerImpl.cpp
 

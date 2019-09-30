@@ -71,10 +71,10 @@ DataReaderListenerImpl::on_data_available(DDS::DataReader_ptr reader)
 
     if (info[0].valid_data) {
       std::cout << "Message: subject    = " << messages[0].subject.in() << std::endl
-                << "         subject_id = " << messages[0].subject_id   << std::endl
-                << "         from       = " << messages[0].from.in()    << std::endl
-                << "         count      = " << messages[0].count        << std::endl
-                << "         text       = " << messages[0].text.in()    << std::endl;
+  //              << "         subject_id = " << messages[0].subject_id   << std::endl
+  //              << "         from       = " << messages[0].from.in()    << std::endl
+                << "         count      = " << messages[0].count        << std::endl;
+    //            << "         text       = " << messages[0].text.in()    << std::endl;
 
     }
 
@@ -92,6 +92,7 @@ DataReaderListenerImpl::on_subscription_matched(
   DDS::DataReader_ptr /*reader*/,
   const DDS::SubscriptionMatchedStatus& /*status*/)
 {
+    std::cout << "on_subscription matched" << std::endl;
 }
 
 void
