@@ -80,6 +80,7 @@ int run_subscriber(bool block, DDS::Topic_ptr topic)
 }
 
 int run_publisher(DDS::Topic_ptr topic) {
+    sleep(1);
 	DDS::Publisher_var publisher = m_participant->create_publisher(PUBLISHER_QOS_DEFAULT,
 																   DDS::PublisherListener::_nil(),
 																   OpenDDS::DCPS::DEFAULT_STATUS_MASK);
@@ -121,10 +122,9 @@ int run_publisher(DDS::Topic_ptr topic) {
 			fprintf(stdout,"timed out waiting for subscriber\n");
 		}
 
-      if (writer->get_publication_matched_status(matches) != ::DDS::RETCODE_OK) {
+        if (writer->get_publication_matched_status(matches) != ::DDS::RETCODE_OK) {
 			fprintf(stdout,"got a match\n");
-      }
-
+        }
     } while (matches.current_count < 1);
 
     ws->detach_condition(condition);
