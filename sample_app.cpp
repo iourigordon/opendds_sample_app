@@ -193,85 +193,6 @@ void* publisher_thread(void* args)
     run_publisher(create_msg_topic());
 }
 
-#if 0
-int main(int argc, char* argv[]) {
-
-    OpenDDS::DCPS::set_DCPS_debug_level(10);
-    OpenDDS::DCPS::Transport_debug_level = 6; 
-
-	TheServiceParticipant->set_default_discovery(::OpenDDS::DCPS::Discovery::DEFAULT_RTPS);
-	const std::string config_name = "PerfTestConfig";
-	OpenDDS::DCPS::TransportConfig_rch config = TheTransportRegistry->create_config(config_name);
-	OpenDDS::DCPS::TransportInst_rch trans_inst = TheTransportRegistry->create_inst(config_name, "rtps_udp");
-	OpenDDS::DCPS::RtpsUdpInst_rch udp_rtps_inst = OpenDDS::DCPS::dynamic_rchandle_cast<OpenDDS::DCPS::RtpsUdpInst>(trans_inst);
-
-	//udp_rtps_inst->use_multicast_ = true;
-	//udp_rtps_inst->local_address("0.0.0.0:5001");
-	udp_rtps_inst->datalink_release_delay_ = 10000;
-	//udp_rtps_inst->multicast_interface_ = "wlp3s0";
-#ifdef OPEN_DDS_SOURCE
-    public native String getLocalAddress();
-    public native void setLocalAddress(String la);
-
-    public native boolean isUseMulticast();
-    public native void setUseMulticast(boolean um);
-
-    public native String getMulticastGroupAddress();
-    public native void setMulticastGroupAddress(String mga);
-#endif
-
-    //fprintf(stdout,"transport_type = %s\n",trans_inst->transport_type);
-
-    //udp_rtps_inst->dump();
-	config->instances_.push_back(trans_inst);
-	TheTransportRegistry->global_config(config);
-
-	//ACE::init();
-	DDS::DomainParticipantFactory_var participant_factory = TheServiceParticipant->TheParticipantFactory;
-
-	::DDS::DomainParticipantFactoryQos factory_qos;
-	participant_factory->get_qos (factory_qos);
-	factory_qos.entity_factory.autoenable_created_entities=false;
-	participant_factory->set_qos(factory_qos);
-
-	//OpenDDS domain participant qos is realy weird, just octest sequences
-	//for now let's create domain participant with default qos
-	m_participant = participant_factory->create_participant(0,
-															PARTICIPANT_QOS_DEFAULT,
-															0,
-															OpenDDS::DCPS::DEFAULT_STATUS_MASK);
-    
-    trans_inst->dump();
-	Messenger::MessageTypeSupport_var ts = new Messenger::MessageTypeSupportImpl;
-
-	if (ts->register_type(m_participant, "") != DDS::RETCODE_OK) {
-		fprintf(stdout,"failed to register type\n");
-	}
-
-	CORBA::String_var type_name = ts->get_type_name();
-	fprintf(stdout,"type_name = %s\n", type_name.in());
-	m_topic = m_participant->create_topic("Movie Discussion List",
-										  type_name,
-										  TOPIC_QOS_DEFAULT,
-										  0,
-										  OpenDDS::DCPS::DEFAULT_STATUS_MASK);
-
-    if (CORBA::is_nil(m_topic.in())) {
-		fprintf(stdout,"Failed to create topic\n");
-    }
-
-	run_test();
-
-  // Clean-up!
-    m_participant->delete_contained_entities();
-    participant_factory->delete_participant(m_participant.in());
-
-    TheServiceParticipant->shutdown();
-
-	return 0;
-}
-#else
-
 int main(int argc, char* argv[])
 {
     bool threads;
@@ -308,6 +229,7 @@ int main(int argc, char* argv[])
 
             RtpsDiscovery_rch disc = make_rch<RtpsDiscovery>("RtpsDiscovery");
             rui->use_multicast_ = true;
+            disc->sedp_multicast(true);
 
             TheServiceParticipant->add_discovery(static_rchandle_cast<Discovery>(disc));
             TheServiceParticipant->set_repo_domain(domain, disc->key());
@@ -360,4 +282,3 @@ int main(int argc, char* argv[])
 
     return 0;
 }
-#endif
