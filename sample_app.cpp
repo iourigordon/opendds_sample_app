@@ -229,6 +229,8 @@ int main(int argc, char* argv[])
 
             RtpsDiscovery_rch disc = make_rch<RtpsDiscovery>("RtpsDiscovery");
             rui->use_multicast_ = true;
+            rui->local_address("127.0.0.1:");
+            rui->multicast_interface_="lo";
             disc->sedp_multicast(true);
 
             TheServiceParticipant->add_discovery(static_rchandle_cast<Discovery>(disc));
@@ -236,7 +238,8 @@ int main(int argc, char* argv[])
             DDS::DomainParticipantQos dp_qos;
             dpf->get_default_participant_qos(dp_qos);
 
-            rui->dump();
+            string str_dump = rui->dump_to_str();
+            cout << str_dump << endl;
             if (strcmp(argv[1],"multi") == 0) {
                 threads = true;
             }
